@@ -1,0 +1,4166 @@
+{
+  "info": {
+    "name": "Bank bootcamp",
+    "description": "Run from top to bottom through http://localhost:8080. Each run creates new documents, so it can be repeated. The eight services plus MongoDB, Redis and Kafka must already be running. A top-up returns 202 before the wallet balance changes; the phone transfer and the cash-out succeed after yanki.wallet.result is APPLIED.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const now = new Date();",
+          "const utcDay = now.getUTCDate();",
+          "pm.collectionVariables.set('utcDay', String(utcDay));",
+          "pm.collectionVariables.set('fixedTermDay', String(Math.min(utcDay, 28)));",
+          "pm.collectionVariables.set('otherFixedTermDay', utcDay === 1 ? '2' : '1');",
+          "const isoDate = function (millis) { return new Date(millis).toISOString().slice(0, 10); };",
+          "pm.collectionVariables.set('futureDate', isoDate(now.getTime() + 30 * 86400000));",
+          "pm.collectionVariables.set('pastDate', isoDate(now.getTime() - 2 * 86400000));",
+          "pm.collectionVariables.set('reportFrom', new Date(now.getTime() - 86400000).toISOString());",
+          "pm.collectionVariables.set('reportTo', new Date(now.getTime() + 86400000).toISOString());"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "runId",
+      "value": ""
+    },
+    {
+      "key": "username",
+      "value": ""
+    },
+    {
+      "key": "personalCustomerId",
+      "value": ""
+    },
+    {
+      "key": "vipCustomerId",
+      "value": ""
+    },
+    {
+      "key": "businessCustomerId",
+      "value": ""
+    },
+    {
+      "key": "payerCustomerId",
+      "value": ""
+    },
+    {
+      "key": "personalLoanId",
+      "value": ""
+    },
+    {
+      "key": "personalCardId",
+      "value": ""
+    },
+    {
+      "key": "savingsAccountId",
+      "value": ""
+    },
+    {
+      "key": "checkingAccountId",
+      "value": ""
+    },
+    {
+      "key": "debitCardId",
+      "value": ""
+    },
+    {
+      "key": "debitCardNumber",
+      "value": ""
+    },
+    {
+      "key": "walletId",
+      "value": ""
+    },
+    {
+      "key": "walletId2",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "description": "Public auth routes. The admin user is created at startup.",
+      "item": [
+        {
+          "name": "Register a user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\":\"{{username}}\",\"password\":\"secret123\",\"roles\":[\"CUSTOMER\"]}"
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "description": "Creates a login. Each collection run uses a new username.",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const stamp = Date.now().toString();",
+                  "const tail = stamp.slice(-7);",
+                  "pm.collectionVariables.set('runId', stamp);",
+                  "pm.collectionVariables.set('username', 'user' + stamp);",
+                  "pm.collectionVariables.set('personalDni', '1' + tail);",
+                  "pm.collectionVariables.set('vipDni', '2' + tail);",
+                  "pm.collectionVariables.set('payerDni', '3' + tail);",
+                  "pm.collectionVariables.set('disposableDni', '4' + tail);",
+                  "pm.collectionVariables.set('overdueDni', '5' + tail);",
+                  "pm.collectionVariables.set('yankiDni', '6' + tail);",
+                  "pm.collectionVariables.set('yankiCex', '7' + tail);",
+                  "pm.collectionVariables.set('businessRuc', '20' + stamp.slice(-9));",
+                  "pm.collectionVariables.set('yankiPhone', '9' + stamp.slice(-8));",
+                  "pm.collectionVariables.set('yankiPhone2', '8' + stamp.slice(-8));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a duplicate username",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\":\"{{username}}\",\"password\":\"secret123\"}"
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('already registered'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login as admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\":\"admin\",\"password\":\"admin123\"}"
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "description": "Stores the bearer token used by every following request.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('token', body.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a wrong password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\":\"admin\",\"password\":\"wrong-password\"}"
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('Invalid username or password'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a login without a password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\":\"admin\",\"password\":\"\"}"
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a call without a token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/customers",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 401', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Customers",
+      "description": "Personal, VIP and PYME customers, plus the profile and document rules.",
+      "item": [
+        {
+          "name": "Create a personal customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/customers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DNI\",\n  \"documentNumber\": \"{{personalDni}}\",\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Perez\",\n  \"email\": \"ana{{runId}}@example.com\",\n  \"phone\": \"999000111\",\n  \"customerType\": \"PERSONAL\",\n  \"profile\": \"STANDARD\"\n}"
+            }
+          },
+          "description": "DNI, standard profile. This customer owns the main accounts and the personal loan.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('personalCustomerId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create a VIP customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/customers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"CEX\",\n  \"documentNumber\": \"{{vipDni}}\",\n  \"firstName\": \"Luis\",\n  \"lastName\": \"Rojas\",\n  \"email\": \"luis{{runId}}@example.com\",\n  \"phone\": \"999000222\",\n  \"customerType\": \"PERSONAL\",\n  \"profile\": \"VIP\"\n}"
+            }
+          },
+          "description": "CEX and the VIP profile. A VIP savings account also needs a credit card.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('vipCustomerId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create a PYME business",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/customers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"RUC\",\n  \"documentNumber\": \"{{businessRuc}}\",\n  \"businessName\": \"Norte PYME {{runId}}\",\n  \"email\": \"pyme{{runId}}@example.com\",\n  \"phone\": \"999000333\",\n  \"customerType\": \"BUSINESS\",\n  \"profile\": \"PYME\"\n}"
+            }
+          },
+          "description": "A business customer is identified with RUC and can be PYME, not VIP.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('businessCustomerId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create the third-party payer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/customers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"PASSPORT\",\n  \"documentNumber\": \"{{payerDni}}\",\n  \"firstName\": \"Rosa\",\n  \"lastName\": \"Diaz\",\n  \"email\": \"rosa{{runId}}@example.com\",\n  \"phone\": \"999000444\",\n  \"customerType\": \"PERSONAL\",\n  \"profile\": \"STANDARD\"\n}"
+            }
+          },
+          "description": "Passport. This person pays loans and cards that belong to other customers.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('payerCustomerId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create a disposable customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/customers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DNI\",\n  \"documentNumber\": \"{{disposableDni}}\",\n  \"firstName\": \"Nora\",\n  \"lastName\": \"Solis\",\n  \"email\": \"nora{{runId}}@example.com\",\n  \"phone\": \"999000555\",\n  \"customerType\": \"PERSONAL\",\n  \"profile\": \"STANDARD\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('disposableCustomerId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get one customer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/customers/{{personalCustomerId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List customers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/customers"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update a customer",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/customers/{{disposableCustomerId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DNI\",\n  \"documentNumber\": \"{{disposableDni}}\",\n  \"firstName\": \"Nora\",\n  \"lastName\": \"Solis\",\n  \"email\": \"nora.updated{{runId}}@example.com\",\n  \"phone\": \"999000555\",\n  \"customerType\": \"PERSONAL\",\n  \"profile\": \"STANDARD\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a personal customer with the PYME profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/customers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"documentType\":\"DNI\",\"documentNumber\":\"90000001\",\"firstName\":\"Eva\",\"lastName\":\"Cruz\",\"customerType\":\"PERSONAL\",\"profile\":\"PYME\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('cannot have the PYME profile'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a personal customer identified with RUC",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/customers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"documentType\":\"RUC\",\"documentNumber\":\"90000002\",\"firstName\":\"Eva\",\"lastName\":\"Cruz\",\"customerType\":\"PERSONAL\",\"profile\":\"STANDARD\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('cannot be identified with RUC'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a personal customer without a name",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/customers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"documentType\":\"DNI\",\"documentNumber\":\"90000003\",\"customerType\":\"PERSONAL\",\"profile\":\"STANDARD\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('first name'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a business customer with the VIP profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/customers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"documentType\":\"RUC\",\"documentNumber\":\"20900000004\",\"businessName\":\"VIP Empresa\",\"customerType\":\"BUSINESS\",\"profile\":\"VIP\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('cannot have the VIP profile'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a business customer without RUC",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/customers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"documentType\":\"DNI\",\"documentNumber\":\"90000005\",\"businessName\":\"Sin RUC\",\"customerType\":\"BUSINESS\",\"profile\":\"STANDARD\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('must be identified with RUC'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a business customer without a business name",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/customers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"documentType\":\"RUC\",\"documentNumber\":\"20900000006\",\"customerType\":\"BUSINESS\",\"profile\":\"STANDARD\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('business name'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a duplicate document",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/customers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DNI\",\n  \"documentNumber\": \"{{personalDni}}\",\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Perez\",\n  \"email\": \"ana{{runId}}@example.com\",\n  \"phone\": \"999000111\",\n  \"customerType\": \"PERSONAL\",\n  \"profile\": \"STANDARD\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('already exists'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a missing customer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/customers/missing-customer"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('was not found'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete a customer",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/customers/{{disposableCustomerId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Credit",
+      "description": "One personal loan, extra credit cards, business loans, charges, third-party payments and reports.",
+      "item": [
+        {
+          "name": "Open a personal loan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/loans",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{personalCustomerId}}\",\"principal\":1000,\"dueDate\":\"{{futureDate}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('personalLoanId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get the loan",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/loans/{{personalLoanId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List loans",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/loans"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update the loan due date",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/loans/{{personalLoanId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"dueDate\":\"{{futureDate}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a second loan for a personal customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/loans",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{personalCustomerId}}\",\"principal\":100,\"dueDate\":\"{{futureDate}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('only one loan'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Open a credit card besides the personal loan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/credit-cards",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{personalCustomerId}}\",\"creditLimit\":2000,\"paymentDueDate\":\"{{futureDate}}\"}"
+            }
+          },
+          "description": "A credit card does not count as the single personal loan.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('personalCardId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get the credit card",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/credit-cards/{{personalCardId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List credit cards",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/credit-cards"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Charge the credit card",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/credit-cards/{{personalCardId}}/charges",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":300}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a charge above the available credit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/credit-cards/{{personalCardId}}/charges",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":5000}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('exceeds the available credit'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pay the credit card as the owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/credit-cards/{{personalCardId}}/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":100,\"payerCustomerId\":\"{{personalCustomerId}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pay the credit card as a third party",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/credit-cards/{{personalCardId}}/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":50,\"payerCustomerId\":\"{{payerCustomerId}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a card payment greater than the used credit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/credit-cards/{{personalCardId}}/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":10000,\"payerCustomerId\":\"{{personalCustomerId}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('greater than the outstanding debt'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update the credit card due date",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/credit-cards/{{personalCardId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"dueDate\":\"{{futureDate}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check that the personal customer is not overdue",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/debt-status/{{personalCustomerId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Not overdue', function () { pm.expect(pm.response.json().overdue).to.eql(false); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check that the payer has no credit card yet",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/debt-status/{{payerCustomerId}}/credit-card"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('No card', function () { pm.expect(pm.response.json().exists).to.eql(false); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check that the personal customer has a credit card",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/debt-status/{{personalCustomerId}}/credit-card"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Card exists', function () { pm.expect(pm.response.json().exists).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Report credit card movements",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/credit-reports?productKind=CARD&from={{reportFrom}}&to={{reportTo}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Report loan movements",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/credit-reports?productKind=LOAN&from={{reportFrom}}&to={{reportTo}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List the last 10 credit card movements",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/credit-reports/credit-cards/{{personalCardId}}/last"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject deleting a card that has used credit",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/credit-cards/{{personalCardId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('used credit cannot be deleted'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pay the remaining credit card balance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/credit-cards/{{personalCardId}}/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":150,\"payerCustomerId\":\"{{personalCustomerId}}\"}"
+            }
+          },
+          "description": "300 charged, then 100 and 50 paid, so 150 remains.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete a fully paid credit card",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/credit-cards/{{personalCardId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pay part of the loan as the owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/loans/{{personalLoanId}}/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":100,\"payerCustomerId\":\"{{personalCustomerId}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pay part of the loan as a third party",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/loans/{{personalLoanId}}/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":200,\"payerCustomerId\":\"{{payerCustomerId}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject deleting a loan that still has debt",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/loans/{{personalLoanId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('outstanding debt cannot be deleted'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Open the first business loan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/loans",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{businessCustomerId}}\",\"principal\":5000,\"dueDate\":\"{{futureDate}}\"}"
+            }
+          },
+          "description": "A business customer may hold more than one loan.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('businessLoanId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Open a second business loan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/loans",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{businessCustomerId}}\",\"principal\":800,\"dueDate\":\"{{futureDate}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('businessLoanId2', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pay a business loan from another customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/loans/{{businessLoanId2}}/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":800,\"payerCustomerId\":\"{{payerCustomerId}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete a loan that has been paid in full",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/loans/{{businessLoanId2}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a missing loan",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/loans/missing-loan"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('was not found'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Accounts",
+      "description": "One savings account, one checking account, several fixed-term accounts, transfers and the ledger.",
+      "item": [
+        {
+          "name": "Open a savings account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{personalCustomerId}}\",\"accountType\":\"SAVINGS\",\"initialDeposit\":200}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('savingsAccountId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get the savings account",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accounts/{{savingsAccountId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List accounts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accounts"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a second savings account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{personalCustomerId}}\",\"accountType\":\"SAVINGS\",\"initialDeposit\":10}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('only one savings account'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Open a checking account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{personalCustomerId}}\",\"accountType\":\"CHECKING\",\"initialDeposit\":200}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('checkingAccountId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a second checking account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{personalCustomerId}}\",\"accountType\":\"CHECKING\",\"initialDeposit\":10}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('only one checking account'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Open a fixed-term account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{personalCustomerId}}\",\"accountType\":\"FIXED_TERM\",\"fixedTermDay\":{{fixedTermDay}},\"initialDeposit\":0}"
+            }
+          },
+          "description": "The movement day is today in UTC, capped at 28. Opening does not count as a movement when the deposit is zero. A personal customer may open many fixed-term accounts.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('fixedTermAccountId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Open a second fixed-term account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{personalCustomerId}}\",\"accountType\":\"FIXED_TERM\",\"fixedTermDay\":{{fixedTermDay}},\"initialDeposit\":0}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('fixedTermAccountId2', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a fixed-term day outside 1 to 28",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{personalCustomerId}}\",\"accountType\":\"FIXED_TERM\",\"fixedTermDay\":31,\"initialDeposit\":10}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('movement day between 1 and 28'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deposit on the fixed-term day",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{fixedTermAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":10}"
+            }
+          },
+          "description": "On UTC days 29, 30 and 31 the account day is 28, so the deposit is rejected.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const day = Number(pm.collectionVariables.get('utcDay'));",
+                  "pm.test('The deposit is accepted only on the configured day', function () {",
+                  "    pm.response.to.have.status(day <= 28 ? 200 : 422);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a second fixed-term movement on the same day",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{fixedTermAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":5}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "const day = Number(pm.collectionVariables.get('utcDay'));",
+                  "pm.test('The rule is explained', function () {",
+                  "    const message = pm.response.json().message;",
+                  "    if (day <= 28) { pm.expect(message).to.include('only one movement'); }",
+                  "    else { pm.expect(message).to.include('only moves on day'); }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Open a fixed-term account for a different day",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{personalCustomerId}}\",\"accountType\":\"FIXED_TERM\",\"fixedTermDay\":{{otherFixedTermDay}},\"initialDeposit\":0}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('otherFixedTermAccountId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a fixed-term movement on the wrong day",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{otherFixedTermAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":5}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('only moves on day'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deposit into savings",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{savingsAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":50}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Withdraw from savings",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{savingsAccountId}}/withdrawals",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":20}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a withdrawal above the balance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{savingsAccountId}}/withdrawals",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":100000}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('enough balance'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a zero amount",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{savingsAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":0}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('greater than zero'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Transfer between two accounts of the same customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/transfers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"sourceAccountId\":\"{{savingsAccountId}}\",\"targetAccountId\":\"{{checkingAccountId}}\",\"amount\":30}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a transfer to the same account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/transfers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"sourceAccountId\":\"{{savingsAccountId}}\",\"targetAccountId\":\"{{savingsAccountId}}\",\"amount\":5}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('different accounts'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Charge the checking maintenance fee",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accounts/{{checkingAccountId}}/maintenance-fee"
+          },
+          "description": "A standard checking account is charged the configured fee. A savings fee of zero leaves the balance unchanged.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Leave the savings maintenance fee at zero",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accounts/{{savingsAccountId}}/maintenance-fee"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List the savings movements",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/movements?accountId={{savingsAccountId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const list = pm.response.json();",
+                  "pm.collectionVariables.set('movementId', list[list.length - 1].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get one movement",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/movements/{{movementId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update a movement description",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/movements/{{movementId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"description\":\"Corrected description\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete a movement and rebuild the balance",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/movements/{{movementId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Report account movements for a date range",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/account-reports?accountId={{savingsAccountId}}&from={{reportFrom}}&to={{reportTo}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject an unknown account type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{personalCustomerId}}\",\"accountType\":\"CRYPTO\",\"initialDeposit\":10}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('Unknown account type'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a missing account",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accounts/missing-account"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('was not found'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject deleting an account that still has a balance",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accounts/{{savingsAccountId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('still has a balance'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Open an empty fixed-term account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{personalCustomerId}}\",\"accountType\":\"FIXED_TERM\",\"fixedTermDay\":{{fixedTermDay}},\"initialDeposit\":0}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('emptyFixedTermAccountId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete an account with no balance and no debit card",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accounts/{{emptyFixedTermAccountId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Commission",
+      "description": "Every account gets five free movements per month. The next one costs 1.50.",
+      "item": [
+        {
+          "name": "Open a checking account for the commission quota",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{payerCustomerId}}\",\"accountType\":\"CHECKING\",\"initialDeposit\":100}"
+            }
+          },
+          "description": "The opening deposit is movement 1. Five movements per month are free, and the sixth costs 1.50.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('commissionAccountId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deposit 2 of 5 inside the free quota",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{commissionAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":10}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deposit 3 of 5 inside the free quota",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{commissionAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":10}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deposit 4 of 5 inside the free quota",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{commissionAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":10}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deposit 5 of 5 inside the free quota",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{commissionAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":10}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deposit once the free quota is over",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{commissionAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":10}"
+            }
+          },
+          "description": "100 plus five deposits of 10, minus the 1.50 commission.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Balance is 148.5', function () { pm.expect(Number(body.balance)).to.eql(148.5); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Savings limit",
+      "description": "A savings account stops after 10 counted movements in the month.",
+      "item": [
+        {
+          "name": "Open a savings account with no opening movement",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{payerCustomerId}}\",\"accountType\":\"SAVINGS\",\"initialDeposit\":0}"
+            }
+          },
+          "description": "Savings accounts accept at most 10 counted movements per month.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('capAccountId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Savings movement 1 of 10",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{capAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":1}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Savings movement 2 of 10",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{capAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":1}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Savings movement 3 of 10",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{capAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":1}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Savings movement 4 of 10",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{capAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":1}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Savings movement 5 of 10",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{capAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":1}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Savings movement 6 of 10",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{capAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":1}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Savings movement 7 of 10",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{capAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":1}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Savings movement 8 of 10",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{capAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":1}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Savings movement 9 of 10",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{capAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":1}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Savings movement 10 of 10",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{capAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":1}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject the savings movement past the monthly limit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{capAccountId}}/deposits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":1}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('monthly movement limit'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "VIP and PYME",
+      "description": "VIP savings and PYME checking both require an active credit card. A business can only open checking accounts.",
+      "item": [
+        {
+          "name": "Reject a VIP savings account without a credit card",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{vipCustomerId}}\",\"accountType\":\"SAVINGS\",\"initialDeposit\":100}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('requires an active credit card'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Open a credit card for the VIP customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/credit-cards",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{vipCustomerId}}\",\"creditLimit\":1500,\"paymentDueDate\":\"{{futureDate}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('vipCardId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Open the VIP savings account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{vipCustomerId}}\",\"accountType\":\"SAVINGS\",\"initialDeposit\":100}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('vipSavingsAccountId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Charge the VIP penalty when the balance is below the minimum",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accounts/{{vipSavingsAccountId}}/evaluate-average"
+          },
+          "description": "The minimum daily average is 500 and the shortfall penalty is 10. A balance of 100 becomes 90.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Balance is 90', function () { pm.expect(Number(body.balance)).to.eql(90); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a PYME checking account without a credit card",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{businessCustomerId}}\",\"accountType\":\"CHECKING\",\"holderIds\":[\"{{businessCustomerId}}\"],\"initialDeposit\":300}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('requires an active credit card'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Open a credit card for the PYME business",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/credit-cards",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{businessCustomerId}}\",\"creditLimit\":4000,\"paymentDueDate\":\"{{futureDate}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('businessCardId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a savings account for a business",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{businessCustomerId}}\",\"accountType\":\"SAVINGS\",\"holderIds\":[\"{{businessCustomerId}}\"],\"initialDeposit\":10}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('only open checking'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a business account that omits the primary holder",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{businessCustomerId}}\",\"accountType\":\"CHECKING\",\"holderIds\":[\"{{payerCustomerId}}\"],\"initialDeposit\":10}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('primary customer'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Open the PYME checking account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{businessCustomerId}}\",\"accountType\":\"CHECKING\",\"holderIds\":[\"{{businessCustomerId}}\"],\"signerIds\":[\"{{payerCustomerId}}\"],\"initialDeposit\":300}"
+            }
+          },
+          "description": "PYME checking has no maintenance fee and requires an active credit card.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('pymeCheckingAccountId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Open a second checking account for the business",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{businessCustomerId}}\",\"accountType\":\"CHECKING\",\"holderIds\":[\"{{businessCustomerId}}\",\"{{payerCustomerId}}\"],\"initialDeposit\":50}"
+            }
+          },
+          "description": "A business customer is not limited to one checking account.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('pymeCheckingAccountId2', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update the business holders and signers",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{pymeCheckingAccountId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"holderIds\":[\"{{businessCustomerId}}\",\"{{payerCustomerId}}\"],\"signerIds\":[\"{{payerCustomerId}}\"]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a holder list that drops the primary customer",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{pymeCheckingAccountId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"holderIds\":[\"{{payerCustomerId}}\"],\"signerIds\":[]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('primary holder'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Leave the PYME maintenance fee at zero",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/accounts/{{pymeCheckingAccountId}}/maintenance-fee"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Balance is 300', function () { pm.expect(Number(body.balance)).to.eql(300); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Transfer to an account of another customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/transfers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"sourceAccountId\":\"{{checkingAccountId}}\",\"targetAccountId\":\"{{pymeCheckingAccountId}}\",\"amount\":25}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Charge the business credit card",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/credit-cards/{{businessCardId}}/charges",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":100}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pay the business credit card as a third party",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/credit-cards/{{businessCardId}}/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":40,\"payerCustomerId\":\"{{personalCustomerId}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Overdue debt",
+      "description": "A customer with overdue credit cannot acquire another product.",
+      "item": [
+        {
+          "name": "Create the customer who will be overdue",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/customers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DNI\",\n  \"documentNumber\": \"{{overdueDni}}\",\n  \"firstName\": \"Pedro\",\n  \"lastName\": \"Leon\",\n  \"email\": \"pedro{{runId}}@example.com\",\n  \"phone\": \"999000666\",\n  \"customerType\": \"PERSONAL\",\n  \"profile\": \"STANDARD\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('overdueCustomerId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Open a loan that is already past due",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/loans",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{overdueCustomerId}}\",\"principal\":700,\"dueDate\":\"{{pastDate}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('overdueLoanId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm the overdue flag",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/debt-status/{{overdueCustomerId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Overdue', function () { pm.expect(pm.response.json().overdue).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject another loan while debt is overdue",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/loans",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{overdueCustomerId}}\",\"principal\":100,\"dueDate\":\"{{futureDate}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('overdue debt'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a credit card while debt is overdue",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/credit-cards",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{overdueCustomerId}}\",\"creditLimit\":500,\"paymentDueDate\":\"{{futureDate}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('overdue debt'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject an account while debt is overdue",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{overdueCustomerId}}\",\"accountType\":\"SAVINGS\",\"initialDeposit\":10}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('overdue debt'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Debit cards",
+      "description": "The card pays merchants from its main account and can pay a credit product through Kafka.",
+      "item": [
+        {
+          "name": "Reject a debit card for an account owned by someone else",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/debit-cards",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{vipCustomerId}}\",\"mainAccountId\":\"{{savingsAccountId}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('must belong to the account owner'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Issue a debit card",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/debit-cards",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"customerId\":\"{{personalCustomerId}}\",\"mainAccountId\":\"{{checkingAccountId}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('debitCardId', body.id);",
+                  "pm.collectionVariables.set('debitCardNumber', body.cardNumber);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List debit cards",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/debit-cards"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get the debit card",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/debit-cards/{{debitCardId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Point the debit card at the savings account",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/debit-cards/{{debitCardId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"mainAccountId\":\"{{savingsAccountId}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pay with the debit card",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/debit-cards/{{debitCardId}}/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":15}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List the last 10 debit card movements",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/account-reports/debit-cards/{{debitCardId}}/last"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pay a loan from the debit card",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/debit-cards/{{debitCardId}}/credit-payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":80,\"productId\":\"{{personalLoanId}}\",\"productKind\":\"LOAN\",\"payerCustomerId\":\"{{personalCustomerId}}\"}"
+            }
+          },
+          "description": "The savings account is debited now. The loan is reduced when Kafka delivers credit.payment.requested.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Yanki",
+      "description": "A wallet is not a bank customer. Phone transfers use the wallet balance. Top-ups and cash-outs use the linked debit card.",
+      "item": [
+        {
+          "name": "Reject a Yanki wallet identified with RUC",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/wallets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"documentType\":\"RUC\",\"documentNumber\":\"20900000999\",\"phone\":\"900000001\",\"imei\":\"100000000000001\",\"email\":\"ruc@example.com\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('DNI, CEX or PASSPORT'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create the first Yanki wallet",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/wallets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DNI\",\n  \"documentNumber\": \"{{yankiDni}}\",\n  \"phone\": \"{{yankiPhone}}\",\n  \"imei\": \"356938035643809\",\n  \"email\": \"yanki{{runId}}@example.com\"\n}"
+            }
+          },
+          "description": "The holder does not have to be a bank customer. The phone is the payment key.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('walletId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create the second Yanki wallet",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/wallets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"CEX\",\n  \"documentNumber\": \"{{yankiCex}}\",\n  \"phone\": \"{{yankiPhone2}}\",\n  \"imei\": \"356938035643810\",\n  \"email\": \"yanki2{{runId}}@example.com\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('walletId2', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get a wallet",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/wallets/{{walletId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List wallets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/wallets"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update the wallet email and device",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/wallets/{{walletId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"yanki.updated{{runId}}@example.com\",\"imei\":\"356938035643812\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a phone that already has a wallet",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/wallets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DNI\",\n  \"documentNumber\": \"{{yankiDni}}\",\n  \"phone\": \"{{yankiPhone}}\",\n  \"imei\": \"356938035643809\",\n  \"email\": \"yanki{{runId}}@example.com\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('phone already has a wallet'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a phone transfer without balance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/wallets/transfers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"sourcePhone\":\"{{yankiPhone}}\",\"targetPhone\":\"{{yankiPhone2}}\",\"amount\":10}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('enough balance'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a top-up before a debit card is linked",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/wallets/{{walletId}}/top-ups",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":25}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('linked debit card'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Link the debit card",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/wallets/{{walletId}}/debit-card",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"debitCardNumber\":\"{{debitCardNumber}}\"}"
+            }
+          },
+          "description": "Loads and unloads move only the main account of this card.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Top up the wallet from the bank account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/wallets/{{walletId}}/top-ups",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":25}"
+            }
+          },
+          "description": "Returns 202. The wallet balance increases when the account service publishes yanki.wallet.result with APPLIED.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 202', function () { pm.response.to.have.status(202); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('operationId', body.operationId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Send money by phone",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/wallets/transfers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"sourcePhone\":\"{{yankiPhone}}\",\"targetPhone\":\"{{yankiPhone2}}\",\"amount\":10}"
+            }
+          },
+          "description": "Succeeds with HTTP 200 after the top-up result is APPLIED. Until then the wallet still has no balance and this returns 422.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const code = pm.response.code;",
+                  "pm.test('Transfer is applied once the top-up has been confirmed', function () {",
+                  "    pm.expect(code).to.be.oneOf([200, 422]);",
+                  "});",
+                  "if (code === 422) {",
+                  "    pm.test('The top-up is still pending', function () {",
+                  "        pm.expect(pm.response.json().message).to.include('enough balance');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cash out to the linked bank account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/wallets/{{walletId}}/cash-outs",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"amount\":5}"
+            }
+          },
+          "description": "Debits the wallet immediately and asks the account service to credit the card main account. HTTP 422 means the top-up is still pending.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const code = pm.response.code;",
+                  "pm.test('Cash-out is accepted once the wallet has balance', function () {",
+                  "    pm.expect(code).to.be.oneOf([202, 422]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create a disposable wallet",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/wallets",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"PASSPORT\",\n  \"documentNumber\": \"P{{yankiDni}}\",\n  \"phone\": \"7{{yankiPhone}}\",\n  \"imei\": \"356938035643811\",\n  \"email\": \"yanki3{{runId}}@example.com\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('disposableWalletId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete a wallet with no balance",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/wallets/{{disposableWalletId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a missing wallet",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/wallets/missing-wallet"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', function () { pm.response.to.have.status(422); });",
+                  "pm.test('The rule is explained', function () { pm.expect(pm.response.json().message).to.include('was not found'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
